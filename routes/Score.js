@@ -6,11 +6,6 @@ const auth = require("../middleware/auth");
 const Test = require("../models/Test");
 const { serializeUser } = require("../utils/userSerializer");
 const { saveReadingResult } = require("../services/resultService");
-const {
-    READING_ACADEMIC_TABLE,
-    READING_GENERAL_TABLE,
-    getBandScore
-} = require("../utils/ieltsBands");
 
 // Score qo‘shish yoki yangilash
 router.post("/add", auth, async (req, res) => {
@@ -53,14 +48,7 @@ router.post("/add", auth, async (req, res) => {
             existing = newScore;
         }
 
-        const maybeAcademicBand = Number(readingDetails?.academicBand);
-        const maybeGeneralBand = Number(readingDetails?.generalBand);
-        const academicBand = Number.isFinite(maybeAcademicBand)
-            ? maybeAcademicBand
-            : getBandScore(score, READING_ACADEMIC_TABLE);
-        const generalBand = Number.isFinite(maybeGeneralBand)
-            ? maybeGeneralBand
-            : getBandScore(score, READING_GENERAL_TABLE);
+        const rawTotal = Number(readingDetails?.rawTotal);
 
         await saveReadingResult({
             userId: req.user.id,
@@ -70,9 +58,7 @@ router.post("/add", auth, async (req, res) => {
             reading: {
                 passageScores: readingDetails?.passageScores || [],
                 rawScore: Number(readingDetails?.rawScore ?? score) || 0,
-                rawTotal: Number(readingDetails?.rawTotal) || 40,
-                academicBand,
-                generalBand,
+                rawTotal: Number.isFinite(rawTotal) ? rawTotal : 0,
                 correctAnswers: readingDetails?.correctAnswers || [],
                 wrongAnswers: readingDetails?.wrongAnswers || []
             }

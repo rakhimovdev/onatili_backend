@@ -136,7 +136,7 @@ const saveReadingResult = async ({
         reading: {
             passageScores: normalizeBreakdown(reading.passageScores, "Passage"),
             rawScore: toFiniteNumber(reading.rawScore, 0) || 0,
-            rawTotal: toFiniteNumber(reading.rawTotal, 40) || 40,
+            rawTotal: toFiniteNumber(reading.rawTotal, 0) || 0,
             academicBand: toFiniteNumber(reading.academicBand, null),
             generalBand: toFiniteNumber(reading.generalBand, null),
             correctAnswers: (reading.correctAnswers || []).map((item, index) =>
@@ -149,9 +149,7 @@ const saveReadingResult = async ({
         listening: {},
         writing: {},
         speaking: {},
-        overallBand:
-            toFiniteNumber(reading.academicBand, null) ??
-            toFiniteNumber(reading.generalBand, null)
+        overallBand: null
     };
 
     return upsertResult({ userId, moduleType: "Reading", attemptKey, payload });

@@ -27,7 +27,7 @@ const ReadingResultSchema = new mongoose.Schema(
     {
         passageScores: { type: [ScoreBreakdownSchema], default: [] },
         rawScore: { type: Number, default: 0 },
-        rawTotal: { type: Number, default: 40 },
+        rawTotal: { type: Number, default: 0 },
         academicBand: { type: Number, default: null },
         generalBand: { type: Number, default: null },
         correctAnswers: { type: [ReviewItemSchema], default: [] },
@@ -40,7 +40,7 @@ const ListeningResultSchema = new mongoose.Schema(
     {
         sectionScores: { type: [ScoreBreakdownSchema], default: [] },
         rawScore: { type: Number, default: 0 },
-        rawTotal: { type: Number, default: 40 },
+        rawTotal: { type: Number, default: 0 },
         academicBand: { type: Number, default: null },
         generalBand: { type: Number, default: null },
         correctAnswers: { type: [ReviewItemSchema], default: [] },
