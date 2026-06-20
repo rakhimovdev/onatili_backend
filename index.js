@@ -21,28 +21,58 @@ const AuthRouter = require("./routes/Auth");
 const Results = require("./routes/Results");
 
 // 1. Avval CORS
-const configuredOrigins = String(process.env.FRONTEND_URLS || "")
-    .split(",")
-    .map((origin) => origin.trim())
+const normalizeOrigin = (origin = "") =>
+    String(origin || "")
+        .trim()
+        .replace(/\/+$/, "");
+
+const configuredOrigins = [
+    process.env.FRONTEND_URL,
+    process.env.FRONTEND_URLS
+]
+    .filter(Boolean)
+    .flatMap((value) => String(value).split(","))
+    .map((origin) => normalizeOrigin(origin))
     .filter(Boolean);
 
-const allowedOrigins = [
+const allowedOrigins = new Set([
     "https://unversels.vercel.app",
     "https://unverse-frontend.vercel.app",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
     ...configuredOrigins
+].map((origin) => normalizeOrigin(origin)));
+
+const allowedOriginPatterns = [
+    /^https:\/\/[a-z0-9-]+\.vercel\.app$/i
 ];
+
+const isAllowedOrigin = (origin) => {
+    const normalizedOrigin = normalizeOrigin(origin);
+
+    if (!normalizedOrigin) {
+        return true;
+    }
+
+    if (allowedOrigins.has(normalizedOrigin)) {
+        return true;
+    }
+
+    return allowedOriginPatterns.some((pattern) =>
+        pattern.test(normalizedOrigin)
+    );
+};
+
 const isDev = process.env.NODE_ENV !== "production";
 
 app.use(cors({
     origin: function (origin, callback) {
         if (!origin) return callback(null, true); // Postman kabi holatlar uchun
         if (isDev) return callback(null, true);
-        if (allowedOrigins.includes(origin)) {
+        if (isAllowedOrigin(origin)) {
             return callback(null, true);
         }
-        console.log("❌ Not allowed origin:", origin);
+        console.log("❌ Not allowed origin:", normalizeOrigin(origin));
         return callback(new Error("Not allowed by CORS"));
     },
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
