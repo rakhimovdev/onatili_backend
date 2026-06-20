@@ -36,6 +36,7 @@ const configuredOrigins = [
     .filter(Boolean);
 
 const allowedOrigins = new Set([
+    "https://onatili-two.vercel.app",
     "https://unversels.vercel.app",
     "https://unverse-frontend.vercel.app",
     "http://localhost:3000",
@@ -65,20 +66,35 @@ const isAllowedOrigin = (origin) => {
 
 const isDev = process.env.NODE_ENV !== "production";
 
-app.use(cors({
-    origin: function (origin, callback) {
-        if (!origin) return callback(null, true); // Postman kabi holatlar uchun
-        if (isDev) return callback(null, true);
-        if (isAllowedOrigin(origin)) {
-            return callback(null, true);
-        }
-        console.log("❌ Not allowed origin:", normalizeOrigin(origin));
-        return callback(new Error("Not allowed by CORS"));
-    },
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-    credentials: true
-}));
+const corsOptionsDelegate = (req, callback) => {
+    const requestOrigin = normalizeOrigin(req.header("Origin"));
+
+    if (!requestOrigin || isDev || isAllowedOrigin(requestOrigin)) {
+        return callback(null, {
+            origin: true,
+            credentials: true,
+            methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+            allowedHeaders: ["Content-Type", "Authorization"],
+            optionsSuccessStatus: 200,
+            preflightContinue: false
+        });
+    }
+
+    console.log("❌ Not allowed origin:", requestOrigin);
+
+    // Do not throw here: throwing makes preflight fail with HTTP 500.
+    return callback(null, {
+        origin: false,
+        credentials: true,
+        methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allowedHeaders: ["Content-Type", "Authorization"],
+        optionsSuccessStatus: 200,
+        preflightContinue: false
+    });
+};
+
+app.use(cors(corsOptionsDelegate));
+app.options(/.*/, cors(corsOptionsDelegate));
 
 // 2. Body parser
 app.use(express.json());
