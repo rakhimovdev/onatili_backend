@@ -41,6 +41,8 @@ const allowedOrigins = new Set([
     "https://unverse-frontend.vercel.app",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
     ...configuredOrigins
 ].map((origin) => normalizeOrigin(origin)));
 
@@ -68,15 +70,18 @@ const isDev = process.env.NODE_ENV !== "production";
 
 const corsOptionsDelegate = (req, callback) => {
     const requestOrigin = normalizeOrigin(req.header("Origin"));
+    const baseCorsOptions = {
+        credentials: true,
+        methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allowedHeaders: ["Content-Type", "Authorization"],
+        optionsSuccessStatus: 204,
+        preflightContinue: true
+    };
 
     if (!requestOrigin || isDev || isAllowedOrigin(requestOrigin)) {
         return callback(null, {
-            origin: true,
-            credentials: true,
-            methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-            allowedHeaders: ["Content-Type", "Authorization"],
-            optionsSuccessStatus: 200,
-            preflightContinue: false
+            ...baseCorsOptions,
+            origin: true
         });
     }
 
@@ -84,17 +89,19 @@ const corsOptionsDelegate = (req, callback) => {
 
     // Do not throw here: throwing makes preflight fail with HTTP 500.
     return callback(null, {
-        origin: false,
-        credentials: true,
-        methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-        allowedHeaders: ["Content-Type", "Authorization"],
-        optionsSuccessStatus: 200,
-        preflightContinue: false
+        ...baseCorsOptions,
+        origin: false
     });
 };
 
 app.use(cors(corsOptionsDelegate));
-app.options(/.*/, cors(corsOptionsDelegate));
+app.use((req, res, next) => {
+    if (req.method === "OPTIONS") {
+        return res.sendStatus(204);
+    }
+
+    return next();
+});
 
 // 2. Body parser
 app.use(express.json());
