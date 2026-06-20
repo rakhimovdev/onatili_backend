@@ -28,6 +28,16 @@ dotenv.config();
 const uploadDir = path.join(__dirname, "..", "uploads");
 fs.mkdirSync(uploadDir, { recursive: true });
 
+const isDatabaseUnavailableError = (error) => {
+    const message = String(error?.message || "");
+
+    return (
+        /buffering timed out/i.test(message) ||
+        /before initial connection is complete/i.test(message) ||
+        /server selection/i.test(message)
+    );
+};
+
 // =====================
 // Role Middleware
 // =====================
@@ -129,9 +139,20 @@ router.post("/register", async (req, res) => {
         });
     } catch (error) {
         console.error("Register error:", error);
+        if (isDatabaseUnavailableError(error)) {
+            return res.status(503).json({
+                message: "Database connection is not ready yet. Please try again in a few seconds."
+            });
+        }
         if (error?.code === 11000) {
             const dupField = Object.keys(error.keyPattern || {})[0] || "Field";
             return res.status(400).json({ message: `${dupField} allaqachon mavjud!` });
+        }
+        if (error?.name === "ValidationError") {
+            const firstMessage = Object.values(error.errors || {})[0]?.message;
+            return res.status(400).json({
+                message: firstMessage || "Validation failed while creating the user."
+            });
         }
         res.status(500).json({ message: "Internal Server Error" });
     }

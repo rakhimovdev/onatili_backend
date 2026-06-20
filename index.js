@@ -20,6 +20,8 @@ const WritingAi = require("./routes/WritingAi");
 const AuthRouter = require("./routes/Auth");
 const Results = require("./routes/Results");
 
+mongoose.set("bufferCommands", false);
+
 // 1. Avval CORS
 const normalizeOrigin = (origin = "") =>
     String(origin || "")
@@ -118,40 +120,74 @@ if (!url || !process.env.JWT_SECRET) {
     process.exit(1);
 }
 
-mongoose.connect(url)
-    .then(async () => {
-        console.log("✅ MongoDBga ulandi");
+const isDatabaseReady = () => mongoose.connection.readyState === 1;
 
-        try {
-            const [studentTypeResult, verificationResult] = await Promise.all([
-                UserModel.updateMany(
-                    {
-                        role: "student",
-                        $or: [
-                            { studentType: { $exists: false } },
-                            { studentType: null },
-                            { studentType: "" }
-                        ]
-                    },
-                    { $set: { studentType: "insider" } }
-                ),
-                UserModel.updateMany(
-                    { isVerified: { $exists: false } },
-                    { $set: { isVerified: true } }
-                )
-            ]);
+const runUserMigrations = async () => {
+    try {
+        const [studentTypeResult, verificationResult] = await Promise.all([
+            UserModel.updateMany(
+                {
+                    role: "student",
+                    $or: [
+                        { studentType: { $exists: false } },
+                        { studentType: null },
+                        { studentType: "" }
+                    ]
+                },
+                { $set: { studentType: "insider" } }
+            ),
+            UserModel.updateMany(
+                { isVerified: { $exists: false } },
+                { $set: { isVerified: true } }
+            )
+        ]);
 
-            if (studentTypeResult?.modifiedCount) {
-                console.log(`✅ ${studentTypeResult.modifiedCount} student insider qilib yangilandi`);
-            }
-            if (verificationResult?.modifiedCount) {
-                console.log(`✅ ${verificationResult.modifiedCount} user verified flag bilan yangilandi`);
-            }
-        } catch (err) {
-            console.error("❌ User migratsiya xatosi:", err);
+        if (studentTypeResult?.modifiedCount) {
+            console.log(`✅ ${studentTypeResult.modifiedCount} student insider qilib yangilandi`);
         }
-    })
-    .catch((error) => console.error("❌ MongoDB ulanishda xato:", error));
+        if (verificationResult?.modifiedCount) {
+            console.log(`✅ ${verificationResult.modifiedCount} user verified flag bilan yangilandi`);
+        }
+    } catch (err) {
+        console.error("❌ User migratsiya xatosi:", err);
+    }
+};
+
+mongoose.connection.on("error", (error) => {
+    console.error("❌ MongoDB connection error:", error);
+});
+
+mongoose.connection.on("disconnected", () => {
+    console.error("❌ MongoDB ulanishi uzildi");
+});
+
+mongoose.connection.on("reconnected", () => {
+    console.log("✅ MongoDB qayta ulandi");
+});
+
+app.get("/health", (req, res) => {
+    const databaseReady = isDatabaseReady();
+
+    return res.status(databaseReady ? 200 : 503).json({
+        ok: databaseReady,
+        databaseReady,
+        environment: process.env.NODE_ENV || "development"
+    });
+});
+
+app.use((req, res, next) => {
+    if (req.method === "OPTIONS" || req.path === "/health") {
+        return next();
+    }
+
+    if (!isDatabaseReady()) {
+        return res.status(503).json({
+            message: "Database connection is not ready yet. Please try again in a few seconds."
+        });
+    }
+
+    return next();
+});
 
 // 5. Routes
 app.use("/auth", AuthRouter);
@@ -170,6 +206,23 @@ app.use("/results", Results);
 app.use('/api/click', clickRoutes)
 // 6. Server
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-    console.log(`🚀 Server ${PORT} portda ishlamoqda`);
-});
+
+const startServer = async () => {
+    try {
+        await mongoose.connect(url, {
+            serverSelectionTimeoutMS: 15000
+        });
+        console.log("✅ MongoDBga ulandi");
+
+        await runUserMigrations();
+
+        app.listen(PORT, () => {
+            console.log(`🚀 Server ${PORT} portda ishlamoqda`);
+        });
+    } catch (error) {
+        console.error("❌ MongoDB ulanishda xato:", error);
+        process.exit(1);
+    }
+};
+
+startServer();
